@@ -1,0 +1,47 @@
+pragma solidity ^0.8.0;
+
+contract CarbonOffsetPlatform {
+    struct CarbonCredit {
+        address owner;
+        uint256 amount;
+        bool retired;
+    }
+    
+    mapping(address => uint256) public balances;
+    mapping(address => CarbonCredit[]) public carbonCredits;
+    uint256 public carbonCreditPrice;
+    address payable public platformOwner;
+    
+    constructor(uint256 _carbonCreditPrice) {
+        platformOwner = payable(msg.sender);
+        carbonCreditPrice = _carbonCreditPrice;
+    }
+    
+    function purchaseCarbonCredits(uint256 _amount) public payable {
+        require(msg.value == carbonCreditPrice * _amount, "Incorrect amount sent");
+        balances[msg.sender] += _amount;
+        carbonCredits[msg.sender].push(CarbonCredit(msg.sender, _amount, false));
+    }
+    
+    function retireCarbonCredits(uint256 _amount) public {
+        require(balances[msg.sender] >= _amount, "Not enough carbon credits");
+        
+        uint256 retiredCredits = 0;
+        for (uint256 i = 0; i < carbonCredits[msg.sender].length && retiredCredits < _amount; i++) {
+            if (!carbonCredits[msg.sender][i].retired) {
+                carbonCredits[msg.sender][i].retired = true;
+                retiredCredits += carbonCredits[msg.sender][i].amount;
+            }
+        }
+        
+        require(retiredCredits == _amount, "Could not retire the requested amount of carbon credits");
+        
+        uint256 payout = carbonCreditPrice * _amount;
+        payable(msg.sender).transfer(payout);
+    }
+    
+    function withdrawFunds() public {
+        require(msg.sender == platformOwner, "Only platform owner can withdraw funds");
+        payable(platformOwner).transfer(address(this).balance);
+    }
+}
