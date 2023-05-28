@@ -1,47 +1,91 @@
 pragma solidity ^0.8.0;
 
-contract CarbonOffsetPlatform {
-    struct CarbonCredit {
-        address owner;
-        uint256 amount;
-        bool retired;
+contract ETHValidator {
+    uint256 public constant rewardRate = 15;
+    uint256 public constant carbonCreditRate = 1;
+    uint256 public constant scalingFactor = 100;
+
+    mapping(address => uint256) public carbonCredits;
+    mapping(address => uint256) public stakeBalances;
+    mapping(address => uint256) public lastUpdateTime;
+
+    function stake() public payable {
+        require(msg.value > 0, "Staking amount must be greater than 0");
+        require(stakeBalances[msg.sender] == 0, "You already have an active stake");
+
+        uint256 stakeAmount = msg.value;
+        stakeBalances[msg.sender] = stakeAmount;
+        lastUpdateTime[msg.sender] = block.timestamp;
     }
-    
-    mapping(address => uint256) public balances;
-    mapping(address => CarbonCredit[]) public carbonCredits;
-    uint256 public carbonCreditPrice;
-    address payable public platformOwner;
-    
-    constructor(uint256 _carbonCreditPrice) {
-        platformOwner = payable(msg.sender);
-        carbonCreditPrice = _carbonCreditPrice;
+
+    function unstake() public {
+        require(stakeBalances[msg.sender] > 0, "You do not have an active stake");
+
+        uint256 stakeAmount = stakeBalances[msg.sender];
+        uint256 carbonCreditsEarned = calculateCarbonCreditsEarned(msg.sender);
+        carbonCredits[msg.sender] += carbonCreditsEarned;
+
+        stakeBalances[msg.sender] = 0;
+        lastUpdateTime[msg.sender] = 0;
+
+        payable(msg.sender).transfer(stakeAmount + carbonCreditsEarned);
     }
-    
-    function purchaseCarbonCredits(uint256 _amount) public payable {
-        require(msg.value == carbonCreditPrice * _amount, "Incorrect amount sent");
-        balances[msg.sender] += _amount;
-        carbonCredits[msg.sender].push(CarbonCredit(msg.sender, _amount, false));
+
+    function calculateCarbonCreditsEarned(address validator) internal view returns (uint256) {
+        uint256 elapsedTime = block.timestamp - lastUpdateTime[validator];
+        uint256 carbonCreditsEarned = (stakeBalances[validator] * rewardRate * carbonCreditRate * elapsedTime) / scalingFactor;
+        return carbonCreditsEarned;
     }
-    
-    function retireCarbonCredits(uint256 _amount) public {
-        require(balances[msg.sender] >= _amount, "Not enough carbon credits");
-        
-        uint256 retiredCredits = 0;
-        for (uint256 i = 0; i < carbonCredits[msg.sender].length && retiredCredits < _amount; i++) {
-            if (!carbonCredits[msg.sender][i].retired) {
-                carbonCredits[msg.sender][i].retired = true;
-                retiredCredits += carbonCredits[msg.sender][i].amount;
-            }
-        }
-        
-        require(retiredCredits == _amount, "Could not retire the requested amount of carbon credits");
-        
-        uint256 payout = carbonCreditPrice * _amount;
-        payable(msg.sender).transfer(payout);
+
+    function swapCarbonCreditsForETH(uint256 creditsToSwap) public {
+        require(carbonCredits[msg.sender] >= creditsToSwap, "Not enough carbon credits to swap");
+
+        uint256 ethToTransfer = creditsToSwap * carbonCreditRate;
+        carbonCredits[msg.sender] -= creditsToSwap;
+
+        payable(msg.sender).transfer(ethToTransfer);contract ETHValidator {
+    uint256 public constant rewardRate = 15;
+    uint256 public constant carbonCreditRate = 1;
+    uint256 public constant scalingFactor = 100;
+
+    mapping(address => uint256) public carbonCredits;
+    mapping(address => uint256) public stakeBalances;
+    mapping(address => uint256) public lastUpdateTime;
+
+    function stake() public payable {
+        require(msg.value > 0, "Staking amount must be greater than 0");
+        require(stakeBalances[msg.sender] == 0, "You already have an active stake");
+
+        uint256 stakeAmount = msg.value;
+        stakeBalances[msg.sender] = stakeAmount;
+        lastUpdateTime[msg.sender] = block.timestamp;
     }
-    
-    function withdrawFunds() public {
-        require(msg.sender == platformOwner, "Only platform owner can withdraw funds");
-        payable(platformOwner).transfer(address(this).balance);
+
+    function unstake() public {
+        require(stakeBalances[msg.sender] > 0, "You do not have an active stake");
+
+        uint256 stakeAmount = stakeBalances[msg.sender];
+        uint256 carbonCreditsEarned = calculateCarbonCreditsEarned(msg.sender);
+        carbonCredits[msg.sender] += carbonCreditsEarned;
+
+        stakeBalances[msg.sender] = 0;
+        lastUpdateTime[msg.sender] = 0;
+
+        payable(msg.sender).transfer(stakeAmount + carbonCreditsEarned);
+    }
+
+    function calculateCarbonCreditsEarned(address validator) internal view returns (uint256) {
+        uint256 elapsedTime = block.timestamp - lastUpdateTime[validator];
+        uint256 carbonCreditsEarned = (stakeBalances[validator] * rewardRate * carbonCreditRate * elapsedTime) / scalingFactor;
+        return carbonCreditsEarned;
+    }
+
+    function swapCarbonCreditsForETH(uint256 creditsToSwap) public {
+        require(carbonCredits[msg.sender] >= creditsToSwap, "Not enough carbon credits to swap");
+
+        uint256 ethToTransfer = creditsToSwap * carbonCreditRate;
+        carbonCredits[msg.sender] -= creditsToSwap;
+
+        payable(msg.sender).transfer(ethToTransfer);
     }
 }
